@@ -112,6 +112,7 @@ const createPlace = async (req, res, next) => {
     image: req.file.path,
     creator: req.userData.userId,
   });
+  console.log(req.file.path);
 
   let user;
   try {
