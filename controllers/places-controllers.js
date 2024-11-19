@@ -11,9 +11,12 @@ const User = require("../models/user");
 
 const getPlaceById = async (req, res, next) => {
   const placeId = req.params.pid;
+  if (!mongoose.Types.ObjectId.isValid(placeId)) {
+    return next(new HttpError("Invalid place ID.", 400));
+  }
   let place;
   try {
-    place = await Place.findById(placeId);
+    place = await Place.findById(placeId).lean();
   } catch (err) {
     const error = new HttpError(
       "Something went wrong, could not find a place",
@@ -29,12 +32,13 @@ const getPlaceById = async (req, res, next) => {
     return next(error);
   }
 
-  res.json({ place: place.toObject({ getters: true }) });
+  res.json({ place });
 };
 
+/*
 const getPlacesByUserId = async (req, res, next) => {
   const userId = req.params.uid;
-
+ 
   let userWithPlaces;
   try {
     userWithPlaces = await User.findById(userId).populate("places");
@@ -53,19 +57,18 @@ const getPlacesByUserId = async (req, res, next) => {
   }
 
   res.json({
-    places: userWithPlaces.places.map((place) =>
-      place.toObject({ getters: true })
-    ),
+    places: userWithPlaces.places.map((place) => place),
   });
 };
 
-/*
-Optional
+*/
+
 const getPlacesByUserId = async (req, res, next) => {
   const userId = req.params.uid;
+
   let places;
   try {
-    places = await Place.find({ creator: userId });
+    places = await Place.find({ creator: userId }).lean({ virtuals: true });
   } catch (err) {
     const error = new HttpError(
       "Fetching places failed, please try again later",
@@ -81,10 +84,9 @@ const getPlacesByUserId = async (req, res, next) => {
   }
 
   res.json({
-    places: places.map((place) => place.toObject({ getters: true })),
+    places,
   });
 };
-*/
 
 const createPlace = async (req, res, next) => {
   const errors = validationResult(req);

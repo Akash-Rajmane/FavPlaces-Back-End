@@ -8,7 +8,7 @@ const User = require("../models/user");
 const getUsers = async (req, res, next) => {
   let users;
   try {
-    users = await User.find({}, "-password");
+    users = await User.find({}, "-password").lean({ virtuals: true });
   } catch (err) {
     const error = new HttpError(
       "Fetching users failed, please try again later",
@@ -17,7 +17,7 @@ const getUsers = async (req, res, next) => {
     return next(error);
   }
 
-  res.json({ users: users.map((user) => user.toObject({ getters: true })) });
+  res.json({ users });
 };
 
 const signup = async (req, res, next) => {
@@ -31,7 +31,7 @@ const signup = async (req, res, next) => {
 
   let existingUser;
   try {
-    existingUser = await User.findOne({ email: email });
+    existingUser = await User.findOne({ email: email }).lean();
   } catch (err) {
     const error = new HttpError(
       "Signing up failed, please try again later.",
@@ -103,7 +103,9 @@ const login = async (req, res, next) => {
   let existingUser;
 
   try {
-    existingUser = await User.findOne({ email: email });
+    existingUser = await User.findOne({ email: email }).lean({
+      virtuals: true,
+    });
   } catch (err) {
     const error = new HttpError(
       "Logging in failed, please try again later",
@@ -142,7 +144,7 @@ const login = async (req, res, next) => {
   let token;
   try {
     token = jwt.sign(
-      { userId: existingUser.id, email: existingUser.email },
+      { userId: existingUser._id, email: existingUser.email },
       `${process.env.JWT_KEY}`,
       { expiresIn: "1h" }
     );
@@ -155,7 +157,7 @@ const login = async (req, res, next) => {
   }
 
   res.json({
-    userId: existingUser.id,
+    userId: existingUser._id,
     email: existingUser.email,
     token: token,
   });
