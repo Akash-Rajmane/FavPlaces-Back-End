@@ -73,6 +73,17 @@ const createPlace = async (req, res, next) => {
 
   const { title, description, address } = req.body;
 
+  // ✅ Image required
+  if (!req.file) {
+    return next(new HttpError("Image upload failed", 422));
+  }
+
+  // ✅ Address required
+  if (!address || address.trim().length === 0) {
+    return next(new HttpError("Address is required", 422));
+  }
+
+  // ✅ Get coordinates
   let coordinates;
   try {
     coordinates = await getCoordsForAddress(address);
@@ -92,7 +103,7 @@ const createPlace = async (req, res, next) => {
   let user;
   try {
     user = await User.findById(req.userData.userId);
-  } catch (err) {
+  } catch {
     return next(new HttpError("Creating place failed, please try again", 500));
   }
 
@@ -100,6 +111,7 @@ const createPlace = async (req, res, next) => {
     return next(new HttpError("Could not find user for provided id", 404));
   }
 
+  // ✅ Save place + user atomically
   try {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -109,11 +121,12 @@ const createPlace = async (req, res, next) => {
     await user.save({ session });
 
     await session.commitTransaction();
-  } catch (err) {
+    session.endSession();
+  } catch {
     return next(new HttpError("Creating place failed, please try again", 500));
   }
 
-  // 🔔 NOTIFY FOLLOWERS (AFTER PLACE IS SAVED)
+  // 🔔 NOTIFY ACCEPTED FOLLOWERS (BEST-EFFORT)
   try {
     const followers = await Follow.find({
       following: req.userData.userId,
@@ -121,7 +134,7 @@ const createPlace = async (req, res, next) => {
     });
 
     for (const f of followers) {
-      // Save in-app notification
+      // In-app notification
       await Notification.create({
         recipient: f.follower,
         sender: req.userData.userId,
@@ -144,8 +157,8 @@ const createPlace = async (req, res, next) => {
       }
     }
   } catch (err) {
+    // ❗ NEVER fail place creation due to notification errors
     console.error("Notification error:", err.message);
-    // ❗ Do NOT fail the API if notification fails
   }
 
   res.status(201).json({
