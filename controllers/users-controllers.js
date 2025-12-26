@@ -4,20 +4,47 @@ const jwt = require("jsonwebtoken");
 
 const HttpError = require("../models/http-error");
 const User = require("../models/user");
+const Follow = require("../models/follow");
 
 const getUsers = async (req, res, next) => {
   let users;
   try {
-    users = await User.find({}, "-password").lean({ virtuals: true });
+    users = await User.find({}, "-password").lean();
   } catch (err) {
-    const error = new HttpError(
-      "Fetching users failed, please try again later",
-      500
-    );
-    return next(error);
+    return next(new HttpError("Fetching users failed", 500));
   }
 
-  res.json({ users });
+  // 🔒 If NOT logged in → return users as-is
+  if (!req.userData || !req.userData.userId) {
+    return res.json({ users });
+  }
+
+  const viewerId = req.userData.userId;
+
+  // Get all follow relations where viewer is follower
+  const follows = await Follow.find({
+    follower: viewerId,
+  }).lean();
+
+  // Map: followingUserId -> status
+  const followMap = {};
+  follows.forEach((f) => {
+    followMap[f.following.toString()] = f.status;
+  });
+
+  const usersWithFollowStatus = users.map((user) => {
+    // ❌ never show follow status for self
+    if (user._id.toString() === viewerId) {
+      return user;
+    }
+
+    return {
+      ...user,
+      followStatus: followMap[user._id.toString()] || "none",
+    };
+  });
+
+  res.json({ users: usersWithFollowStatus });
 };
 
 const signup = async (req, res, next) => {

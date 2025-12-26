@@ -3,10 +3,11 @@ const { check } = require("express-validator");
 
 const usersControllers = require("../controllers/users-controllers");
 const { uploadUserImage } = require("../middleware/file-upload");
+const optionalAuth = require("../middleware/check-auth");
 
 const router = express.Router();
 
-router.get("/", usersControllers.getUsers);
+router.get("/", optionalAuth, usersControllers.getUsers);
 
 router.post(
   "/signup",
