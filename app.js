@@ -9,6 +9,7 @@ const path = require("path");
 const placesRoutes = require("./routes/places-routes");
 const usersRoutes = require("./routes/users-routes");
 const followRoutes = require("./routes/follow-routes");
+const pushRoutes = require("./routes/push-routes");
 const HttpError = require("./models/http-error");
 
 const app = express();
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 app.use("/api/places", placesRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/follow", followRoutes);
+app.use("/api/push", pushRoutes);
 
 app.use((req, res, next) => {
   const error = new HttpError("Could not find this route.", 404);
