@@ -88,6 +88,7 @@ const createPlace = async (req, res, next) => {
   try {
     coordinates = await getCoordsForAddress(address);
   } catch (error) {
+    console.log("Geocoding failed:", error);
     return next(error);
   }
 
@@ -103,7 +104,8 @@ const createPlace = async (req, res, next) => {
   let user;
   try {
     user = await User.findById(req.userData.userId);
-  } catch {
+  } catch (err) {
+    console.error("User lookup failed:", err);
     return next(new HttpError("Creating place failed, please try again", 500));
   }
 
@@ -122,7 +124,8 @@ const createPlace = async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
-  } catch {
+  } catch (err) {
+    console.error("Place creation for user failed:", err);
     return next(new HttpError("Creating place failed, please try again", 500));
   }
 
