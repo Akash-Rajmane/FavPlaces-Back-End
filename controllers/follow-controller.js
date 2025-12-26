@@ -4,7 +4,7 @@ const Follow = require("../models/follow");
 const User = require("../models/user");
 const Notification = require("../models/notification");
 const PushSubscription = require("../models/pushSubscription");
-const sendPush = require("../utils/push");
+const sendPush = require("../util/push");
 const HttpError = require("../models/http-error");
 
 // -------------------- SEND FOLLOW REQUEST --------------------
