@@ -180,6 +180,19 @@ const createPlace = async (req, res, next) => {
         link: `/places/user/${req.userData.userId}`,
       });
       // ... (Push subscription logic)
+      // after await Notification.create({...})
+      const sub = await PushSubscription.findOne({ user: f.follower });
+      if (sub) {
+        try {
+          sendPush(sub.subscription, {
+            title: `${user.name} added a new place 📍`,
+            body: createdPlace.title || "New place added",
+            url: `/places/user/${req.userData.userId}`,
+          });
+        } catch (err) {
+          console.error("Send place push failed:", err.message);
+        }
+      }
     }
   } catch (err) {
     console.error("Notification error:", err.message);

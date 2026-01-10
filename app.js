@@ -32,6 +32,7 @@ app.use("/api/places", placesRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/follow", followRoutes);
 app.use("/api/push", pushRoutes);
+app.use("/api/notifications", require("./routes/notifications-routes"));
 
 app.use((req, res, next) => {
   const error = new HttpError("Could not find this route.", 404);
