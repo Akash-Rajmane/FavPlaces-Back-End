@@ -1,50 +1,79 @@
 const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 
 const HttpError = require("../models/http-error");
 const User = require("../models/user");
-const Follow = require("../models/follow");
 
 const getUsers = async (req, res, next) => {
-  let users;
+  let viewerId = null;
+
+  if (req.userData?.userId && mongoose.isValidObjectId(req.userData.userId)) {
+    viewerId = new mongoose.Types.ObjectId(req.userData.userId);
+  }
+
   try {
-    users = await User.find({}, "-password").lean();
-  } catch (err) {
-    return next(new HttpError("Fetching users failed", 500));
-  }
+    // 🔒 Not logged in OR invalid id → fast path
+    if (!viewerId) {
+      const users = await User.find(
+        {},
+        { name: 1, image: 1, places: 1 }
+      ).lean();
 
-  // 🔒 If NOT logged in → return users as-is
-  if (!req.userData || !req.userData.userId) {
-    return res.json({ users });
-  }
-
-  const viewerId = req.userData.userId;
-
-  // Get all follow relations where viewer is follower
-  const follows = await Follow.find({
-    follower: viewerId,
-  }).lean();
-
-  // Map: followingUserId -> status
-  const followMap = {};
-  follows.forEach((f) => {
-    followMap[f.following.toString()] = f.status;
-  });
-
-  const usersWithFollowStatus = users.map((user) => {
-    // ❌ never show follow status for self
-    if (user._id.toString() === viewerId) {
-      return user;
+      return res.json({ users });
     }
 
-    return {
-      ...user,
-      followStatus: followMap[user._id.toString()] || "none",
-    };
-  });
+    // 🔓 Logged-in → aggregation
+    const users = await User.aggregate([
+      {
+        $project: {
+          name: 1,
+          image: 1,
+          places: 1,
+        },
+      },
+      {
+        $lookup: {
+          from: "follows",
+          let: { targetUserId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$follower", viewerId] },
+                    { $eq: ["$following", "$$targetUserId"] },
+                  ],
+                },
+              },
+            },
+            { $project: { status: 1, _id: 0 } },
+          ],
+          as: "followData",
+        },
+      },
+      {
+        $addFields: {
+          followStatus: {
+            $cond: [
+              { $eq: ["$_id", viewerId] },
+              "$$REMOVE",
+              {
+                $ifNull: [{ $arrayElemAt: ["$followData.status", 0] }, "none"],
+              },
+            ],
+          },
+        },
+      },
+      { $project: { followData: 0 } },
+    ]);
 
-  res.json({ users: usersWithFollowStatus });
+    res.json({ users });
+  } catch (err) {
+    console.error(err);
+    return next(new HttpError("Fetching users failed", 500));
+  }
 };
 
 const signup = async (req, res, next) => {

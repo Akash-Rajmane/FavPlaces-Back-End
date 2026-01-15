@@ -44,11 +44,25 @@ const getPlaceById = async (req, res, next) => {
 // -------------------- GET PLACES BY USER --------------------
 const getPlacesByUserId = async (req, res, next) => {
   const userId = req.params.uid;
+  if (!mongoose.isValidObjectId(userId)) {
+    return next(new HttpError("Invalid user id", 400));
+  }
 
   let places;
   try {
-    places = await Place.find({ creator: userId }).lean({ virtuals: true });
+    places = await Place.find(
+      { creator: userId },
+      {
+        title: 1,
+        description: 1,
+        image: 1,
+        address: 1,
+        creator: 1,
+        location_geo: 1,
+      }
+    ).lean();
   } catch (err) {
+    console.error(err);
     return next(
       new HttpError("Fetching places failed, please try again later", 500)
     );

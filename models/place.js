@@ -32,18 +32,10 @@ const placeSchema = new Schema({
   },
 });
 
-// 1. Create the Geospatial Index
+// Create the Geospatial Index
 placeSchema.index({ location_geo: "2dsphere" });
 
-// 2. Create the Virtual 'location' field
-placeSchema.virtual("location").get(function () {
-  return {
-    lng: this.location_geo.coordinates[0],
-    lat: this.location_geo.coordinates[1],
-  };
-});
-
-// 2. Add the Vibe Virtual Field Plugin
+//  Add the Vibe Virtual Field Plugin
 placeSchema.virtual("vibe").get(function () {
   if (!this.description) return "Neutral 😶";
   const result = sentiment.analyze(this.description);
