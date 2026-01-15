@@ -62,7 +62,6 @@ const getPlacesByUserId = async (req, res, next) => {
       }
     ).lean();
   } catch (err) {
-    console.error(err);
     return next(
       new HttpError("Fetching places failed, please try again later", 500)
     );
