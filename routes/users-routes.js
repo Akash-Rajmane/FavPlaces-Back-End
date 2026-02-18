@@ -1,9 +1,8 @@
-const express = require("express");
-const { check } = require("express-validator");
-
-const usersControllers = require("../controllers/users-controllers");
-const { uploadUserImage } = require("../middleware/file-upload");
-const optionalAuth = require("../middleware/optional-auth");
+import express from "express";
+import { check } from "express-validator";
+import * as usersControllers from "../controllers/users-controllers.js";
+import { uploadUserImage } from "../middleware/file-upload.js";
+import optionalAuth from "../middleware/optional-auth.js";
 
 const router = express.Router();
 
@@ -22,4 +21,4 @@ router.post(
 
 router.post("/login", usersControllers.login);
 
-module.exports = router;
+export default router;

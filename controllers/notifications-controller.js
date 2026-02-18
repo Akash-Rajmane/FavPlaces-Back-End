@@ -1,8 +1,8 @@
-const Notification = require("../models/notification");
-const HttpError = require("../models/http-error");
+import Notification from "../models/notification.js";
+import HttpError from "../models/http-error.js";
 
 // GET /api/notifications
-exports.getNotifications = async (req, res, next) => {
+export const getNotifications = async (req, res, next) => {
   try {
     const notifications = await Notification.find({
       recipient: req.userData.userId,
@@ -18,7 +18,7 @@ exports.getNotifications = async (req, res, next) => {
 };
 
 // PATCH /api/notifications/:nid/read
-exports.markAsRead = async (req, res, next) => {
+export const markAsRead = async (req, res, next) => {
   const nid = req.params.nid;
 
   try {

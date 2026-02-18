@@ -1,19 +1,18 @@
-const { validationResult } = require("express-validator");
-const mongoose = require("mongoose");
-const cloudinary = require("cloudinary").v2;
-const axios = require("axios");
-const HttpError = require("../models/http-error");
-const getCoordsForAddress = require("../util/location");
-const Sentiment = require("sentiment");
-const analyzer = new Sentiment();
-const Place = require("../models/place");
-const User = require("../models/user");
+import { validationResult } from "express-validator";
+import mongoose from "mongoose";
+import { v2 as cloudinary } from "cloudinary";
+import axios from "axios";
+import HttpError from "../models/http-error.js";
+import getCoordsForAddress from "../util/location.js";
+import Sentiment from "sentiment";
+import Place from "../models/place.js";
+import User from "../models/user.js";
+import Follow from "../models/follow.js";
+import Notification from "../models/notification.js";
+import PushSubscription from "../models/pushSubscription.js";
+import sendPush from "../util/push.js";
 
-// 🔔 NEW IMPORTS
-const Follow = require("../models/follow");
-const Notification = require("../models/notification");
-const PushSubscription = require("../models/pushSubscription");
-const sendPush = require("../util/push");
+const analyzer = new Sentiment();
 
 // -------------------- GET PLACE BY ID --------------------
 const getPlaceById = async (req, res, next) => {
@@ -386,8 +385,10 @@ const getNearbyPlaces = async (req, res, next) => {
   }
 };
 
-exports.getPlaceById = getPlaceById;
-exports.getPlacesByUserId = getPlacesByUserId;
-exports.createPlace = createPlace;
-exports.updatePlace = updatePlace;
-exports.deletePlace = deletePlace;
+export {
+  getPlaceById,
+  getPlacesByUserId,
+  createPlace,
+  updatePlace,
+  deletePlace,
+};

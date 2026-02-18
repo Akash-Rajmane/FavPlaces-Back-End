@@ -1,14 +1,13 @@
-const mongoose = require("mongoose");
-
-const Follow = require("../models/follow");
-const User = require("../models/user");
-const Notification = require("../models/notification");
-const PushSubscription = require("../models/pushSubscription");
-const sendPush = require("../util/push");
-const HttpError = require("../models/http-error");
+import mongoose from "mongoose";
+import Follow from "../models/follow.js";
+import User from "../models/user.js";
+import Notification from "../models/notification.js";
+import PushSubscription from "../models/pushSubscription.js";
+import sendPush from "../util/push.js";
+import HttpError from "../models/http-error.js";
 
 // -------------------- SEND FOLLOW REQUEST --------------------
-exports.requestFollow = async (req, res, next) => {
+export const requestFollow = async (req, res, next) => {
   const { userId } = req.body;
   const followerId = req.userData.userId;
 
@@ -55,7 +54,7 @@ exports.requestFollow = async (req, res, next) => {
 };
 
 // -------------------- GET FOLLOW REQUESTS --------------------
-exports.getFollowRequests = async (req, res, next) => {
+export const getFollowRequests = async (req, res, next) => {
   try {
     const requests = await Follow.find({
       following: req.userData.userId,
@@ -69,7 +68,7 @@ exports.getFollowRequests = async (req, res, next) => {
 };
 
 // -------------------- ACCEPT FOLLOW --------------------
-exports.acceptFollow = async (req, res, next) => {
+export const acceptFollow = async (req, res, next) => {
   const { followId } = req.body;
 
   try {
@@ -92,7 +91,7 @@ exports.acceptFollow = async (req, res, next) => {
 };
 
 // -------------------- REJECT FOLLOW --------------------
-exports.rejectFollow = async (req, res, next) => {
+export const rejectFollow = async (req, res, next) => {
   const { followId } = req.body;
 
   try {

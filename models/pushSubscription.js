@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const Schema = mongoose.Schema;
 
@@ -15,4 +15,4 @@ const pushSubscriptionSchema = new Schema({
   },
 });
 
-module.exports = mongoose.model("PushSubscription", pushSubscriptionSchema);
+export default mongoose.model("PushSubscription", pushSubscriptionSchema);

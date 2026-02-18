@@ -1,6 +1,7 @@
-const mongoose = require("mongoose");
-const leanVirtuals = require("mongoose-lean-virtuals");
-const Sentiment = require("sentiment"); // 1. Import
+import mongoose from "mongoose";
+import leanVirtuals from "mongoose-lean-virtuals";
+import Sentiment from "sentiment";
+
 const sentiment = new Sentiment();
 const Schema = mongoose.Schema;
 
@@ -52,4 +53,4 @@ placeSchema.plugin(leanVirtuals);
 placeSchema.set("toJSON", { virtuals: true });
 placeSchema.set("toObject", { virtuals: true });
 
-module.exports = mongoose.model("Place", placeSchema);
+export default mongoose.model("Place", placeSchema);

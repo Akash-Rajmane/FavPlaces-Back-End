@@ -1,7 +1,6 @@
-const express = require("express");
-
-const followController = require("../controllers/follow-controller");
-const checkAuth = require("../middleware/check-auth");
+import express from "express";
+import * as followController from "../controllers/follow-controller.js";
+import checkAuth from "../middleware/check-auth.js";
 
 const router = express.Router();
 
@@ -20,4 +19,4 @@ router.post("/accept", followController.acceptFollow);
 // Reject follow request
 router.post("/reject", followController.rejectFollow);
 
-module.exports = router;
+export default router;

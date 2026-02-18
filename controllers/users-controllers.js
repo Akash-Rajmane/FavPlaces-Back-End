@@ -1,10 +1,9 @@
-const { validationResult } = require("express-validator");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
-
-const HttpError = require("../models/http-error");
-const User = require("../models/user");
+import { validationResult } from "express-validator";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import HttpError from "../models/http-error.js";
+import User from "../models/user.js";
 
 const getUsers = async (req, res, next) => {
   let viewerId = null;
@@ -219,6 +218,4 @@ const login = async (req, res, next) => {
   });
 };
 
-exports.getUsers = getUsers;
-exports.signup = signup;
-exports.login = login;
+export { getUsers, signup, login };

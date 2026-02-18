@@ -1,6 +1,6 @@
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const multer = require("multer");
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import multer from "multer";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -32,7 +32,7 @@ const uploadUserImage = multer({ storage: userImageStorage });
 // Multer middleware for place image upload
 const uploadPlaceImage = multer({ storage: placeImageStorage });
 
-module.exports = { uploadUserImage, uploadPlaceImage };
+export { uploadUserImage, uploadPlaceImage };
 
 // const multer = require("multer");
 // const { v4: uuid } = require("uuid");

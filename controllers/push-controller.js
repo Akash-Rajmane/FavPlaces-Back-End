@@ -1,8 +1,8 @@
-const PushSubscription = require("../models/pushSubscription");
-const HttpError = require("../models/http-error");
+import PushSubscription from "../models/pushSubscription.js";
+import HttpError from "../models/http-error.js";
 
 // -------------------- SUBSCRIBE --------------------
-exports.subscribe = async (req, res, next) => {
+export const subscribe = async (req, res, next) => {
   const { subscription } = req.body;
 
   if (!subscription) {
@@ -23,7 +23,7 @@ exports.subscribe = async (req, res, next) => {
 };
 
 // -------------------- UNSUBSCRIBE --------------------
-exports.unsubscribe = async (req, res, next) => {
+export const unsubscribe = async (req, res, next) => {
   try {
     await PushSubscription.findOneAndDelete({
       user: req.userData.userId,

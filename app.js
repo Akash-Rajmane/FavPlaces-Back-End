@@ -1,16 +1,20 @@
-const dotenv = require("dotenv").config();
-const express = require("express");
-const bodyParser = require("body-parser");
-const mongoose = require("mongoose");
+import dotenv from "dotenv";
+import express from "express";
+import bodyParser from "body-parser";
+import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import placesRoutes from "./routes/places-routes.js";
+import usersRoutes from "./routes/users-routes.js";
+import followRoutes from "./routes/follow-routes.js";
+import pushRoutes from "./routes/push-routes.js";
+import notificationsRoutes from "./routes/notifications-routes.js";
+import HttpError from "./models/http-error.js";
 
-const fs = require("fs");
-const path = require("path");
-
-const placesRoutes = require("./routes/places-routes");
-const usersRoutes = require("./routes/users-routes");
-const followRoutes = require("./routes/follow-routes");
-const pushRoutes = require("./routes/push-routes");
-const HttpError = require("./models/http-error");
+dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -32,7 +36,7 @@ app.use("/api/places", placesRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/follow", followRoutes);
 app.use("/api/push", pushRoutes);
-app.use("/api/notifications", require("./routes/notifications-routes"));
+app.use("/api/notifications", notificationsRoutes);
 
 app.use((req, res, next) => {
   const error = new HttpError("Could not find this route.", 404);

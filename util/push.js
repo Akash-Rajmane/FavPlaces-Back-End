@@ -1,4 +1,4 @@
-const webpush = require("web-push");
+import webpush from "web-push";
 
 webpush.setVapidDetails(
   "mailto:" + process.env.MAIL_TO,
@@ -14,4 +14,4 @@ async function sendPush(subscription, payload) {
   }
 }
 
-module.exports = sendPush;
+export default sendPush;

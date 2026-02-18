@@ -1,5 +1,5 @@
-const axios = require("axios");
-const HttpError = require("../models/http-error");
+import axios from "axios";
+import HttpError from "../models/http-error.js";
 
 const API_KEY = process.env.GMAP_GEOCODE_API_KEY;
 
@@ -54,4 +54,4 @@ async function getCoordsForAddress(address) {
   return data.results[0].geometry.location;
 }
 
-module.exports = getCoordsForAddress;
+export default getCoordsForAddress;
