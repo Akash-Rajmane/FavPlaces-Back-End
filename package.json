@@ -6,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node -r dotenv/config app.js",
-    "dev": "nodemon -r dotenv/config app.js"
+    "dev": "nodemon -r dotenv/config app.js",
+    "sync": "node -r dotenv/config scripts/syncAlgolia.js"
   },
   "engines": {
     "node": ">=14.20.1"
@@ -19,6 +20,7 @@
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
     "cloudinary": "^2.5.0",
+    "compression": "^1.8.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
@@ -29,6 +31,8 @@
     "mongoose-unique-validator": "^4.0.1",
     "multer": "^1.4.5-lts.1",
     "multer-storage-cloudinary": "^4.0.0",
+    "prom-client": "^15.0.0",
+    "redis": "^4.7.0",
     "sentiment": "^5.0.2",
     "uuid": "^9.0.0",
     "web-push": "^3.6.7"

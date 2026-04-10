@@ -1,7 +1,10 @@
 import axios from "axios";
 import HttpError from "../models/http-error.js";
+import { trackExternalCall } from "../middleware/metrics.js";
+import logger from "./logger.js";
 
 const API_KEY = process.env.GMAP_GEOCODE_API_KEY;
+const locationLogger = logger.child({ component: "location" });
 
 async function getCoordsForAddress(address) {
   if (!address || address.trim().length === 0) {
@@ -9,38 +12,40 @@ async function getCoordsForAddress(address) {
   }
 
   if (!API_KEY) {
-    console.error("❌ GMAP_API_KEY is missing");
+    locationLogger.error("Google Maps geocoding API key is missing");
     throw new HttpError("Geocoding API key missing", 500);
   }
 
   let response;
 
   try {
-    response = await axios.get(
-      "https://maps.googleapis.com/maps/api/geocode/json",
-      {
-        params: {
-          address,
-          key: API_KEY,
-        },
-      }
+    response = await trackExternalCall(
+      "google_geocoding",
+      "forward_geocode",
+      () =>
+        axios.get("https://maps.googleapis.com/maps/api/geocode/json", {
+          params: {
+            address,
+            key: API_KEY,
+          },
+        }),
     );
-  } catch (err) {
-    // 🔴 THIS is why nothing was logging
-    console.error("❌ Axios request failed");
-
-    if (err.response) {
-      console.error("Status:", err.response.status);
-      console.error("Data:", err.response.data);
-    } else {
-      console.error("Error:", err.message);
-    }
-
+  } catch (error) {
+    locationLogger.error("Geocoding request failed", {
+      address,
+      error,
+      statusCode: error.response?.status,
+      responseStatus: error.response?.data?.status,
+    });
     throw new HttpError("Geocoding request failed", 500);
   }
 
   const data = response.data;
-  console.log("✅ Geocode response:", data);
+  locationLogger.debug("Geocode lookup completed", {
+    address,
+    responseStatus: data?.status,
+    resultsCount: data?.results?.length || 0,
+  });
 
   if (
     !data ||
@@ -48,6 +53,10 @@ async function getCoordsForAddress(address) {
     !data.results ||
     data.results.length === 0
   ) {
+    locationLogger.warn("Geocoding returned no results", {
+      address,
+      responseStatus: data?.status,
+    });
     throw new HttpError("Could not find location for specified address", 422);
   }
 

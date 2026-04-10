@@ -15,7 +15,7 @@ const notificationSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ["FOLLOW_REQUEST", "NEW_PLACE"],
+      enum: ["FOLLOW_REQUEST", "FOLLOW_ACCEPTED", "NEW_PLACE"],
       required: true,
     },
     message: {
