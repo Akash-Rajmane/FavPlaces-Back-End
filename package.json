@@ -35,7 +35,9 @@
     "redis": "^4.7.0",
     "sentiment": "^5.0.2",
     "uuid": "^9.0.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "winston": "^3.19.0",
+    "winston-loki": "^6.1.4"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

@@ -2,16 +2,21 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import util from "util";
-import { fileURLToPath } from "url";
+import winston from "winston";
+import LokiTransport from "winston-loki";
+import { fileURLToPath, URL } from "url";
+import prometheusConfig from "./prometheus-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const logsDir = path.join(__dirname, "../logs");
+export const logsDir = path.join(__dirname, "../logs");
 
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const SERVICE_NAME = "favplaces-server";
+const SERVICE_NAME = prometheusConfig.appName || "favplaces-server";
+const ENVIRONMENT = prometheusConfig.environment || "development";
+
 const logLevels = {
   error: 0,
   warn: 1,
@@ -19,9 +24,9 @@ const logLevels = {
   debug: 3,
 };
 
-const configuredLevel =
-  process.env.LOG_LEVEL?.toLowerCase() ||
-  (process.env.NODE_ENV === "production" ? "info" : "debug");
+const configuredLevel = (
+  prometheusConfig.logLevel || (process.env.NODE_ENV === "production" ? "info" : "debug")
+).toLowerCase();
 
 const activeLogLevel = Object.prototype.hasOwnProperty.call(
   logLevels,
@@ -37,6 +42,123 @@ const streams = {
   info: fs.createWriteStream(path.join(logsDir, "info.log"), { flags: "a" }),
   debug: fs.createWriteStream(path.join(logsDir, "debug.log"), { flags: "a" }),
 };
+
+const shouldLogToConsole =
+  process.env.NODE_ENV !== "production" ||
+  process.env.LOG_TO_CONSOLE === "true";
+
+const formatConsoleMessage = ({ timestamp, level, message, ...meta }) => {
+  const context = Object.keys(meta).length
+    ? ` ${util.inspect(meta, {
+        depth: 6,
+        colors: Boolean(process.stdout?.isTTY),
+        breakLength: 120,
+      })}`
+    : "";
+  return `[${level}] ${timestamp} ${message}${context}`;
+};
+
+const consoleFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  winston.format.colorize({ all: true }),
+  winston.format.printf(formatConsoleMessage),
+);
+
+const buildLokiHost = () => {
+  const rawHost = prometheusConfig.lokiConfig.host?.trim();
+  if (!rawHost) {
+    return null;
+  }
+
+  const hasScheme = /^https?:\/\//i.test(rawHost);
+  const baseHost = hasScheme ? rawHost : `http://${rawHost}`;
+
+  try {
+    const parsed = new URL(baseHost);
+    if (prometheusConfig.lokiConfig.port) {
+      parsed.port = String(prometheusConfig.lokiConfig.port);
+    }
+
+    return parsed.origin;
+  } catch (error) {
+    console.warn("Invalid Loki host", error);
+    return null;
+  }
+};
+
+const getLokiBasicAuth = () => {
+  if (process.env.LOKI_BASIC_AUTH) {
+    return process.env.LOKI_BASIC_AUTH;
+  }
+
+  const username = process.env.LOKI_USERNAME;
+  const password = process.env.LOKI_PASSWORD;
+
+  if (username && password) {
+    return `${username}:${password}`;
+  }
+
+  return null;
+};
+
+const createLokiTransport = () => {
+  if (!prometheusConfig.lokiConfig.enabled) {
+    return null;
+  }
+
+  const host = buildLokiHost();
+  if (!host) {
+    return null;
+  }
+
+  const transportOptions = {
+    host,
+    json: true,
+    labels: {
+      service: SERVICE_NAME,
+      environment: ENVIRONMENT,
+    },
+    timeout: Number(process.env.LOKI_TIMEOUT_MS || 10_000),
+  };
+
+  const basicAuth = getLokiBasicAuth();
+  if (basicAuth) {
+    transportOptions.basicAuth = basicAuth;
+  }
+
+  return new LokiTransport(transportOptions);
+};
+
+const winstonTransports = [];
+
+if (shouldLogToConsole) {
+  winstonTransports.push(
+    new winston.transports.Console({
+      level: activeLogLevel,
+      format: consoleFormat,
+    }),
+  );
+}
+
+const lokiTransport = createLokiTransport();
+if (lokiTransport) {
+  winstonTransports.push(lokiTransport);
+}
+
+const winstonLogger =
+  winstonTransports.length > 0
+    ? winston.createLogger({
+        level: activeLogLevel,
+        defaultMeta: {
+          service: SERVICE_NAME,
+          environment: ENVIRONMENT,
+          hostname: os.hostname(),
+          pid: process.pid,
+        },
+        transports: winstonTransports,
+      })
+    : null;
 
 const serializeError = (error) => {
   if (!(error instanceof Error)) {
@@ -101,35 +223,6 @@ const createJsonReplacer = () => {
 
 const shouldLog = (level) => logLevels[level] <= logLevels[activeLogLevel];
 
-const writeConsole = (level, message, context = {}) => {
-  const shouldWriteToConsole =
-    process.env.NODE_ENV !== "production" ||
-    process.env.LOG_TO_CONSOLE === "true";
-
-  if (!shouldWriteToConsole) {
-    return;
-  }
-
-  const consoleMethod =
-    level === "error"
-      ? console.error
-      : level === "warn"
-        ? console.warn
-        : console.log;
-
-  const inspectedContext = Object.keys(context).length
-    ? ` ${util.inspect(context, {
-        depth: 6,
-        colors: Boolean(process.stdout?.isTTY),
-        breakLength: 120,
-      })}`
-    : "";
-
-  consoleMethod(
-    `[${level.toUpperCase()}] ${new Date().toISOString()} ${message}${inspectedContext}`,
-  );
-};
-
 const writeLog = (level, message, context = {}) => {
   if (!shouldLog(level)) {
     return;
@@ -139,7 +232,7 @@ const writeLog = (level, message, context = {}) => {
     timestamp: new Date().toISOString(),
     level: level.toUpperCase(),
     service: SERVICE_NAME,
-    environment: process.env.NODE_ENV || "development",
+    environment: ENVIRONMENT,
     hostname: os.hostname(),
     pid: process.pid,
     message,
@@ -150,7 +243,15 @@ const writeLog = (level, message, context = {}) => {
 
   streams[level].write(line + "\n");
   streams.all.write(line + "\n");
-  writeConsole(level, message, context);
+
+  if (winstonLogger) {
+    winstonLogger.log({
+      level,
+      message,
+      ...context,
+      timestamp: entry.timestamp,
+    });
+  }
 };
 
 const createLogger = (bindings = {}) => ({
@@ -185,9 +286,10 @@ const maskEmail = (email) => {
 
 process.on("exit", () => {
   Object.values(streams).forEach((stream) => stream.end());
+  winstonLogger?.close();
 });
 
 const logger = createLogger();
 
-export { createLogger, logsDir, maskEmail, serializeError };
+export { createLogger, serializeError, maskEmail };
 export default logger;
