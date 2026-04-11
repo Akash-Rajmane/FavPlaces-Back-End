@@ -48,8 +48,9 @@ const shouldLogToConsole =
   process.env.LOG_TO_CONSOLE === "true";
 
 const formatConsoleMessage = ({ timestamp, level, message, ...meta }) => {
-  const context = Object.keys(meta).length
-    ? ` ${util.inspect(meta, {
+  const printableMeta = Object.fromEntries(Object.entries(meta));
+  const context = Object.keys(printableMeta).length
+    ? ` ${util.inspect(printableMeta, {
         depth: 6,
         colors: Boolean(process.stdout?.isTTY),
         breakLength: 120,
@@ -115,9 +116,16 @@ const createLokiTransport = () => {
   const transportOptions = {
     host,
     json: true,
+    batching: false,
+    clearOnError: true,
     labels: {
       service: SERVICE_NAME,
       environment: ENVIRONMENT,
+    },
+    onConnectionError: (error) => {
+      process.stderr.write(
+        `[WARN] ${new Date().toISOString()} Loki transport error: ${error.message}\n`,
+      );
     },
     timeout: Number(process.env.LOKI_TIMEOUT_MS || 10_000),
   };
