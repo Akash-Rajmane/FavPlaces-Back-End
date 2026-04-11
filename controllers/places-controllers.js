@@ -15,8 +15,6 @@ import {
   savePlaceRecord,
   updatePlaceRecord,
 } from "../config/algolia.js";
-import cacheKeys from "../util/cache-keys.js";
-import { deleteKeys } from "../util/cache.js";
 import {
   recordBusinessEvent,
   trackDatabaseOperation,
@@ -389,10 +387,6 @@ const createPlace = async (req, res, next) => {
         });
       }
 
-      await deleteKeys(
-        cacheKeys.notificationsList(follower.follower.toString()),
-        cacheKeys.notificationsUnreadCount(follower.follower.toString()),
-      );
     }
 
     requestLogger.debug("Follower notifications processed for a new place", {

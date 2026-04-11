@@ -17,31 +17,11 @@ const followLogger = logger.child({ component: "follow-controller" });
 const getRequestLogger = (req) =>
   req.logger?.child({ component: "follow-controller" }) || followLogger;
 
-const invalidateFollowCaches = async ({
-  requestRecipientId,
-  requestSenderId,
-  recipientHasUnreadNotifications = false,
-  senderHasUnreadNotifications = false,
-}) => {
-  const keys = [
+const invalidateFollowCaches = async (requestRecipientId) => {
+  await deleteKeys(
     cacheKeys.followRequests(requestRecipientId),
-    cacheKeys.notificationsList(requestRecipientId),
     cacheKeys.publicUsers(),
-  ];
-
-  if (recipientHasUnreadNotifications) {
-    keys.push(cacheKeys.notificationsUnreadCount(requestRecipientId));
-  }
-
-  if (requestSenderId) {
-    keys.push(cacheKeys.notificationsList(requestSenderId));
-  }
-
-  if (senderHasUnreadNotifications && requestSenderId) {
-    keys.push(cacheKeys.notificationsUnreadCount(requestSenderId));
-  }
-
-  await deleteKeys(keys);
+  );
 };
 
 export const requestFollow = async (req, res, next) => {
@@ -97,11 +77,7 @@ export const requestFollow = async (req, res, next) => {
     }
 
     recordBusinessEvent("follow_request", "success");
-    await invalidateFollowCaches({
-      requestRecipientId: userId,
-      requestSenderId: followerId,
-      recipientHasUnreadNotifications: true,
-    });
+    await invalidateFollowCaches(userId);
     requestLogger.info("Follow request sent", {
       followId: follow._id.toString(),
       followerId,
@@ -217,11 +193,7 @@ export const acceptFollow = async (req, res, next) => {
     }
 
     recordBusinessEvent("follow_accept", "success");
-    await invalidateFollowCaches({
-      requestRecipientId: req.userData.userId,
-      requestSenderId: follow.follower.toString(),
-      senderHasUnreadNotifications: true,
-    });
+    await invalidateFollowCaches(req.userData.userId);
     requestLogger.info("Follow request accepted", {
       followId,
       userId: req.userData.userId,
@@ -272,10 +244,7 @@ export const rejectFollow = async (req, res, next) => {
     );
 
     recordBusinessEvent("follow_reject", "success");
-    await invalidateFollowCaches({
-      requestRecipientId: req.userData.userId,
-      requestSenderId: follow.follower.toString(),
-    });
+    await invalidateFollowCaches(req.userData.userId);
     requestLogger.info("Follow request rejected", {
       followId,
       userId: req.userData.userId,

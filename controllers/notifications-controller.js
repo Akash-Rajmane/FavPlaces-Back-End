@@ -1,7 +1,6 @@
+import mongoose from "mongoose";
 import Notification from "../models/notification.js";
 import HttpError from "../models/http-error.js";
-import cacheKeys from "../util/cache-keys.js";
-import { deleteKeys, remember } from "../util/cache.js";
 import logger from "../util/logger.js";
 import {
   recordBusinessEvent,
@@ -21,36 +20,46 @@ export const getNotifications = async (req, res, next) => {
 
   try {
     const userId = req.userData.userId;
-    const { value: notifications, cacheHit } = await remember(
-      cacheKeys.notificationsList(userId),
-      30,
+
+    const recipientId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
+    // 🔥 FIXED QUERY
+    const unreadMatch = {
+      recipient: recipientId,
+      $or: [
+        { isRead: false },
+        { isRead: { $exists: false } },
+        { isRead: null },
+      ],
+    };
+
+    const notifications = await trackDatabaseOperation(
+      "find",
+      "notifications",
       () =>
-        trackDatabaseOperation("find", "notifications", () =>
-          Notification.find({
-            recipient: userId,
-          })
-            .sort({ createdAt: -1 })
-            .populate("sender", "name image")
-            .lean({ virtuals: true }),
-        ),
+        Notification.find(unreadMatch)
+          .sort({ createdAt: -1 })
+          .populate("sender", "name image")
+          .lean({ virtuals: true }),
     );
 
-    const { value: unreadCount } = await remember(
-      cacheKeys.notificationsUnreadCount(userId),
-      30,
-      () =>
-        trackDatabaseOperation("countDocuments", "notifications", () =>
-          Notification.countDocuments({
-            recipient: userId,
-            isRead: false,
-          }),
-        ),
+    const unreadCount = await trackDatabaseOperation(
+      "countDocuments",
+      "notifications",
+      () => Notification.countDocuments(unreadMatch),
     );
 
     requestLogger.debug("Fetched notifications", {
       userId,
-      cacheHit,
       unreadCount,
+    });
+
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
     });
 
     res.json({ notifications, unreadCount });
@@ -76,10 +85,13 @@ export const markAsRead = async (req, res, next) => {
 
     if (!notification) {
       recordBusinessEvent("notification_mark_read", "not_found");
-      requestLogger.warn("Notification could not be marked as read because it was not found", {
-        notificationId: nid,
-        userId: req.userData.userId,
-      });
+      requestLogger.warn(
+        "Notification could not be marked as read because it was not found",
+        {
+          notificationId: nid,
+          userId: req.userData.userId,
+        },
+      );
       return next(new HttpError("Notification not found", 404));
     }
 
@@ -98,10 +110,6 @@ export const markAsRead = async (req, res, next) => {
     );
 
     recordBusinessEvent("notification_mark_read", "success");
-    await deleteKeys(
-      cacheKeys.notificationsList(req.userData.userId),
-      cacheKeys.notificationsUnreadCount(req.userData.userId),
-    );
     requestLogger.info("Notification marked as read", {
       notificationId: nid,
       userId: req.userData.userId,

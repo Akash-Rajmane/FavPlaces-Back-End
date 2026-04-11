@@ -87,16 +87,40 @@ app.use(
   express.static(path.join(__dirname, "uploads", "images")),
 );
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://favplaces.netlify.app",
+  "https://fav-places.vercel.app",
+];
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-  );
+  const origin = req.headers.origin;
+
+  const allowedOrigins = [
+    "http://localhost:3000",
+    "https://favplaces.netlify.app",
+    "https://fav-places.vercel.app",
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
+  // 🔥 CRITICAL FIX: reflect exact requested headers
+  const reqHeaders = req.headers["access-control-request-headers"];
+  if (reqHeaders) {
+    res.setHeader("Access-Control-Allow-Headers", reqHeaders);
+  }
+
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET, POST, PATCH, DELETE, OPTIONS",
   );
+
+  // 🔥 MUST terminate preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
   next();
 });
 
