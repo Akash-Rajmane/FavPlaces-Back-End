@@ -19,4 +19,7 @@ router.post("/accept", followController.acceptFollow);
 // Reject follow request
 router.post("/reject", followController.rejectFollow);
 
+// Get network
+router.get("/network", followController.getNetwork);
+
 export default router;

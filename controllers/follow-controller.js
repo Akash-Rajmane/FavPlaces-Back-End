@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Follow from "../models/follow.js";
+import User from "../models/user.js";
 import Notification from "../models/notification.js";
 import PushSubscription from "../models/pushSubscription.js";
 import sendPush from "../util/push.js";
@@ -260,5 +261,35 @@ export const rejectFollow = async (req, res, next) => {
       userId: req.userData.userId,
     });
     return next(new HttpError("Rejecting follow request failed", 500));
+  }
+};
+
+export const getNetwork = async (req, res, next) => {
+  const requestLogger = getRequestLogger(req);
+  const userId = req.userData.userId;
+
+  try {
+    const following = await Follow.find({ follower: userId, status: "accepted" })
+      .populate("following", "name image places");
+
+    const followers = await Follow.find({ following: userId, status: "accepted" })
+      .populate("follower", "name image places");
+
+    const allFollows = await Follow.find({ follower: userId });
+    const excludeIds = allFollows.map(f => f.following.toString());
+    excludeIds.push(userId);
+
+    const suggestions = await trackDatabaseOperation("find", "users", () => 
+      User.find({ _id: { $nin: excludeIds } }, "name image places").limit(15).lean()
+    );
+
+    res.json({
+      following: following.map(f => f.following).filter(Boolean),
+      followers: followers.map(f => f.follower).filter(Boolean),
+      suggestions
+    });
+  } catch (error) {
+    requestLogger.error("Fetching network failed", { error, userId });
+    return next(new HttpError("Fetching network failed", 500));
   }
 };
