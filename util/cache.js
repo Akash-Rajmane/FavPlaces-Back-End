@@ -15,10 +15,11 @@ const redisEnabled =
 let client = null;
 let connectPromise = null;
 let redisDisabledLogged = false;
+let connectionFailedUntil = 0;
 
 const ensureClient = () => {
-  if (!redisEnabled) {
-    if (!redisDisabledLogged) {
+  if (!redisEnabled || Date.now() < connectionFailedUntil) {
+    if (!redisDisabledLogged && !redisEnabled) {
       cacheLogger.info("Redis caching is disabled because no Redis connection is configured");
       redisDisabledLogged = true;
     }
@@ -27,12 +28,24 @@ const ensureClient = () => {
   }
 
   if (!client) {
-    client = createClient({ url: redisUrl });
+    client = createClient({
+      url: redisUrl,
+      socket: {
+        connectTimeout: 1000,
+        reconnectStrategy: (retries) => {
+          if (retries > 0) {
+            return new Error("Redis connection failed");
+          }
+          return 50;
+        },
+      },
+    });
     client.on("error", (error) => {
-      cacheLogger.error("Redis client error", { error });
+      // Suppress spamming error logs when Redis is down
     });
     client.on("ready", () => {
       cacheLogger.info("Redis client is ready");
+      connectionFailedUntil = 0;
     });
     client.on("reconnecting", () => {
       cacheLogger.warn("Redis client reconnecting");
@@ -60,10 +73,25 @@ const getClient = async () => {
   }
 
   try {
-    await connectPromise;
+    // Hard limit of 1 second for Redis connection so API requests NEVER hang
+    await Promise.race([
+      connectPromise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Redis connection timeout")), 1000)
+      ),
+    ]);
     return redisClient;
   } catch (error) {
-    cacheLogger.error("Connecting to Redis failed", { error });
+    cacheLogger.warn("Connecting to Redis failed, bypassing cache", {
+      error: error.message,
+    });
+    connectionFailedUntil = Date.now() + 60000; // Cooldown 1 minute
+    if (client) {
+      try {
+        client.disconnect().catch(() => {});
+      } catch (e) {}
+      client = null;
+    }
     return null;
   }
 };
@@ -133,13 +161,21 @@ const deleteKeys = async (...keys) => {
 };
 
 const remember = async (key, ttlSeconds, loader) => {
-  const cachedValue = await getJson(key);
-  if (cachedValue !== null) {
-    return { value: cachedValue, cacheHit: true };
+  try {
+    const cachedValue = await getJson(key);
+    if (cachedValue !== null) {
+      return { value: cachedValue, cacheHit: true };
+    }
+  } catch (error) {
+    cacheLogger.warn("Cache read failed, skipping cache", { error: error.message });
   }
 
   const freshValue = await loader();
-  await setJson(key, freshValue, ttlSeconds);
+  try {
+    await setJson(key, freshValue, ttlSeconds);
+  } catch (error) {
+    // Ignore cache write failure
+  }
 
   return { value: freshValue, cacheHit: false };
 };

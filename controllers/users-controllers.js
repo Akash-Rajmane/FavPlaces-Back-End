@@ -28,16 +28,26 @@ const getUsers = async (req, res, next) => {
 
   try {
     if (!viewerId) {
-      const { value: users, cacheHit } = await remember(
-        cacheKeys.publicUsers(),
-        120,
-        () =>
-          trackDatabaseOperation("find", "users", () =>
-            User.find({}, { name: 1, image: 1, places: 1 }).lean(),
-          ),
-      );
-
-      requestLogger.debug("Fetched public users list", { cacheHit });
+      let users;
+      try {
+        const { value, cacheHit } = await remember(
+          cacheKeys.publicUsers(),
+          120,
+          () =>
+            trackDatabaseOperation("find", "users", () =>
+              User.find({}, { name: 1, image: 1, places: 1 }).lean(),
+            ),
+        );
+        users = value;
+        requestLogger.debug("Fetched public users list", { cacheHit });
+      } catch (cacheErr) {
+        requestLogger.warn("Cache fetch failed, falling back to direct query", {
+          error: cacheErr.message,
+        });
+        users = await trackDatabaseOperation("find", "users", () =>
+          User.find({}, { name: 1, image: 1, places: 1 }).lean(),
+        );
+      }
 
       return res.json({ users });
     }
