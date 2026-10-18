@@ -18,6 +18,7 @@ export const planAutonomousTrip = async ({
   city,
   days = 1,
   vibe = "Scenic, relaxed, local food, and cultural highlights",
+  startDate = null,
   onlyMyPlaces = false,
   userId = null,
 }) => {
@@ -25,6 +26,7 @@ export const planAutonomousTrip = async ({
     city,
     days,
     vibe,
+    startDate,
     onlyMyPlaces,
   });
 
@@ -115,10 +117,12 @@ export const planAutonomousTrip = async ({
 
   // 5. SYNTHESIS STEP: Gemini builds a realistic, timed itinerary
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const dateInfo = startDate ? `Trip starting on: ${startDate}` : "Flexible / upcoming dates";
   const prompt = `You are the FavPlaces Autonomous Travel Architect.
 Create an inspiring, highly realistic ${days}-day itinerary for ${city || "this destination"}.
 
 Target Vibe: ${vibe}
+Trip Dates: ${dateInfo}
 Live Weather Conditions: Temperature ${liveWeather.currentTemperature}, Rain Risk ${liveWeather.forecastSummary?.rainChance || "Low"}
 Retrieved Community Favorite Places (in optimized route order):
 ${JSON.stringify(
@@ -198,6 +202,7 @@ Format the output strictly as a JSON object with this exact structure:
   const calendarData = generateCalendarEventsTool({
     tripTitle: parsedPlan.tripTitle || `Trip to ${city}`,
     scheduleItems: flattenedSchedule,
+    startDate,
   });
 
   return {

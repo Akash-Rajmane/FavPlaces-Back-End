@@ -88,12 +88,21 @@ export const optimizeRouteOrderTool = ({ places }) => {
  * @param {string} tripTitle
  * @param {Array<{ title: string, timeSlot: string, address: string, description: string, day: number }>} scheduleItems
  */
-export const generateCalendarEventsTool = ({ tripTitle, scheduleItems }) => {
+export const generateCalendarEventsTool = ({ tripTitle, scheduleItems, startDate = null }) => {
   const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
   const now = new Date();
   const dtStamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(
     now.getUTCDate()
   )}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}00Z`;
+
+  // Parse user chosen start date or default to today
+  let baseDate = new Date();
+  if (startDate) {
+    const parsed = new Date(startDate);
+    if (!isNaN(parsed.getTime())) {
+      baseDate = parsed;
+    }
+  }
 
   let icsLines = [
     "BEGIN:VCALENDAR",
@@ -105,8 +114,8 @@ export const generateCalendarEventsTool = ({ tripTitle, scheduleItems }) => {
 
   (scheduleItems || []).forEach((item, index) => {
     // Offset each event by day and sequence
-    const eventDate = new Date();
-    eventDate.setDate(eventDate.getDate() + (item.day ? item.day - 1 : 0));
+    const eventDate = new Date(baseDate);
+    eventDate.setDate(baseDate.getDate() + (item.day ? item.day - 1 : 0));
     const dateStr = `${eventDate.getFullYear()}${pad(
       eventDate.getMonth() + 1
     )}${pad(eventDate.getDate())}`;

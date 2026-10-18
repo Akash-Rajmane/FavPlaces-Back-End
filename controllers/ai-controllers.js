@@ -114,17 +114,18 @@ export const askPlaceAssistantHandler = async (req, res, next) => {
  */
 export const planTripHandler = async (req, res, next) => {
   const requestLogger = req.logger || console;
-  const { city, days, vibe, onlyMyPlaces } = req.body;
+  const { city, days, vibe, startDate, onlyMyPlaces } = req.body;
   const userId = req.userData?.userId || null;
 
   try {
-    requestLogger.info?.("Planning trip with RAG + MCP...", { city, days, vibe });
+    requestLogger.info?.("Planning trip with RAG + MCP...", { city, days, vibe, startDate });
     const { planAutonomousTrip } = await import("../services/trip-planner-service.js");
 
     const tripPlan = await planAutonomousTrip({
       city: city || "Pune",
       days: Number(days) || 1,
       vibe: vibe || "Scenic, relaxed, local food, and cultural highlights",
+      startDate: startDate || null,
       onlyMyPlaces: !!onlyMyPlaces,
       userId,
     });
