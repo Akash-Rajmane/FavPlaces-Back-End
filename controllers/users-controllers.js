@@ -298,4 +298,96 @@ const login = async (req, res, next) => {
   });
 };
 
-export { getUsers, signup, login };
+const googleLogin = async (req, res, next) => {
+  const requestLogger = getRequestLogger(req);
+  const { credential } = req.body;
+
+  if (!credential) {
+    return next(new HttpError("Missing Google credential token.", 400));
+  }
+
+  const { OAuth2Client } = await import("google-auth-library");
+  const client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID ||
+      "384601241809-4t6enfmfhlq6jl7hlemu3lefd14ubdqs.apps.googleusercontent.com"
+  );
+
+  let payload;
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience:
+        process.env.GOOGLE_CLIENT_ID ||
+        "384601241809-4t6enfmfhlq6jl7hlemu3lefd14ubdqs.apps.googleusercontent.com",
+    });
+    payload = ticket.getPayload();
+  } catch (error) {
+    recordAuthEvent("google_login", "token_invalid");
+    requestLogger.error("Google ID token verification failed", { error: error.message });
+    return next(new HttpError("Invalid Google credential token.", 401));
+  }
+
+  const { name, email, picture, sub: googleId } = payload;
+  const maskedEmail = maskEmail(email);
+
+  let user;
+  try {
+    user = await trackDatabaseOperation("findOne", "users", () =>
+      User.findOne({ email }).lean({ virtuals: true })
+    );
+  } catch (error) {
+    recordAuthEvent("google_login", "database_error");
+    requestLogger.error("Database error looking up Google user", { error: error.message, email: maskedEmail });
+    return next(new HttpError("Logging in failed, please try again later.", 500));
+  }
+
+  // If user does not exist yet, auto-create their account with Google profile info
+  if (!user) {
+    try {
+      const randomPassword = await bcrypt.hash(googleId + (process.env.JWT_KEY || "secret"), 12);
+      const newUser = new User({
+        name: name || "Google User",
+        email: email,
+        image: picture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+        password: randomPassword,
+        places: [],
+      });
+
+      await trackDatabaseOperation("insert", "users", () => newUser.save());
+      user = newUser.toObject({ virtuals: true });
+      await deleteKeys(cacheKeys.publicUsers());
+      recordBusinessEvent("user_signup", "google_success");
+      requestLogger.info("New user registered via Google", { userId: user._id.toString(), email: maskedEmail });
+    } catch (createError) {
+      recordAuthEvent("google_login", "create_failed");
+      requestLogger.error("Failed to auto-register user via Google", { error: createError.message });
+      return next(new HttpError("Could not create user account with Google.", 500));
+    }
+  }
+
+  // Issue standard FavPlaces JWT session
+  let token;
+  try {
+    token = jwt.sign(
+      { userId: user._id, email: user.email },
+      `${process.env.JWT_KEY}`,
+      { expiresIn: "1h" }
+    );
+  } catch (tokenErr) {
+    recordAuthEvent("google_login", "token_error");
+    return next(new HttpError("Token creation failed, please try again.", 500));
+  }
+
+  recordAuthEvent("google_login", "success");
+  requestLogger.info("User authenticated via Google", { userId: user._id.toString(), email: maskedEmail });
+
+  res.status(200).json({
+    userId: user._id,
+    email: user.email,
+    name: user.name,
+    image: user.image,
+    token,
+  });
+};
+
+export { getUsers, signup, login, googleLogin };

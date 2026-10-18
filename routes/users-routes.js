@@ -21,4 +21,6 @@ router.post(
 
 router.post("/login", usersControllers.login);
 
+router.post("/google-login", usersControllers.googleLogin);
+
 export default router;
