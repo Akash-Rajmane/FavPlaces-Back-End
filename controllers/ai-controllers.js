@@ -106,3 +106,42 @@ export const askPlaceAssistantHandler = async (req, res, next) => {
     );
   }
 };
+
+/**
+ * Controller: Autonomous Trip Planner (RAG + MCP)
+ * POST /api/ai/plan-trip
+ * Body: { city, days, vibe, onlyMyPlaces }
+ */
+export const planTripHandler = async (req, res, next) => {
+  const requestLogger = req.logger || console;
+  const { city, days, vibe, onlyMyPlaces } = req.body;
+  const userId = req.userData?.userId || null;
+
+  try {
+    requestLogger.info?.("Planning trip with RAG + MCP...", { city, days, vibe });
+    const { planAutonomousTrip } = await import("../services/trip-planner-service.js");
+
+    const tripPlan = await planAutonomousTrip({
+      city: city || "Pune",
+      days: Number(days) || 1,
+      vibe: vibe || "Scenic, relaxed, local food, and cultural highlights",
+      onlyMyPlaces: !!onlyMyPlaces,
+      userId,
+    });
+
+    res.status(200).json({
+      status: "success",
+      plan: tripPlan,
+    });
+  } catch (err) {
+    console.error("Trip planning error:", err);
+    requestLogger.error?.("Trip planning error:", { error: err.message, stack: err.stack });
+    return next(
+      new HttpError(
+        err.message || "Failed to plan trip. Please try again.",
+        500
+      )
+    );
+  }
+};
+

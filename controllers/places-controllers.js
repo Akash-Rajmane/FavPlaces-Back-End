@@ -23,6 +23,7 @@ import {
 import logger from "../util/logger.js";
 import getCoordsForAddress from "../util/location.js";
 import sendPush from "../util/push.js";
+import { generateEmbedding } from "../services/gemini-service.js";
 
 const analyzer = new Sentiment();
 const placesLogger = logger.child({ component: "places-controller" });
@@ -259,6 +260,16 @@ const createPlace = async (req, res, next) => {
     return next(error);
   }
 
+  let embedding;
+  try {
+    const textToEmbed = `${title}. ${description}. Located at: ${address}`;
+    embedding = await generateEmbedding(textToEmbed);
+  } catch (embedError) {
+    requestLogger.warn("Embedding generation failed during place creation, continuing without vector", {
+      error: embedError.message,
+    });
+  }
+
   const createdPlace = new Place({
     title,
     description,
@@ -269,6 +280,7 @@ const createPlace = async (req, res, next) => {
     },
     image: req.file.path,
     creator: req.userData.userId,
+    embedding,
   });
 
   let user;
@@ -460,6 +472,15 @@ const updatePlace = async (req, res, next) => {
 
   place.title = title;
   place.description = description;
+
+  try {
+    const textToEmbed = `${title}. ${description}. Located at: ${place.address}`;
+    place.embedding = await generateEmbedding(textToEmbed);
+  } catch (embedError) {
+    requestLogger.warn("Embedding regeneration failed during place update", {
+      error: embedError.message,
+    });
+  }
 
   try {
     await trackDatabaseOperation("save", "places", () => place.save());

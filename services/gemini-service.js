@@ -188,3 +188,34 @@ Guidelines:
   return response.text?.trim() || "I couldn't find an answer for that right now. Please try again!";
 };
 
+/**
+ * Generate 768-dimensional vector embedding for text using gemini-embedding-001.
+ * @param {string} text - Text to embed
+ * @returns {Promise<number[]>} 768 float values
+ */
+export const generateEmbedding = async (text) => {
+  const ai = getGenAIClient();
+  const cleanedText = (text || "").trim().slice(0, 8000); // Guard token length
+
+  try {
+    const response = await ai.models.embedContent({
+      model: "gemini-embedding-001",
+      contents: cleanedText,
+      config: {
+        outputDimensionality: 768,
+      },
+    });
+
+    const values = response.embeddings?.[0]?.values;
+    if (!values || values.length === 0) {
+      throw new Error("No embedding values returned by Gemini");
+    }
+
+    return values;
+  } catch (err) {
+    aiLogger.error("Failed to generate embedding", { error: err.message });
+    throw err;
+  }
+};
+
+

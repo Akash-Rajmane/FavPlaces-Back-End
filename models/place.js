@@ -31,6 +31,11 @@ const placeSchema = new Schema({
     required: true,
     ref: "User",
   },
+  embedding: {
+    type: [Number],
+    default: undefined,
+    select: false, // Don't return large vector array in standard queries unless explicitly requested
+  },
 });
 
 // Create the Geospatial Index
