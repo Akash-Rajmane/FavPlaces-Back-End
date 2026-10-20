@@ -118,8 +118,12 @@ export const planAutonomousTrip = async ({
   console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 4: Calling live weather...`);
   const anchorLat = optimizedStops[0]?.lat || 18.5204;
   const anchorLng = optimizedStops[0]?.lng || 73.8567;
-  const liveWeather = await getLiveWeatherTool({ lat: anchorLat, lng: anchorLng });
-  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 4 DONE: Weather=${liveWeather.currentTemperature}`);
+  const liveWeather = await getLiveWeatherTool({
+    lat: anchorLat,
+    lng: anchorLng,
+    startDate,
+  });
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 4 DONE: Weather=${liveWeather.currentTemperature} (${liveWeather.weatherLabel})`);
 
   // 5. SYNTHESIS STEP: Gemini builds a realistic, timed itinerary
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -129,7 +133,7 @@ Create an inspiring, highly realistic ${days}-day itinerary for ${city || "this 
 
 Target Vibe: ${vibe}
 Trip Dates: ${dateInfo}
-Live Weather Conditions: Temperature ${liveWeather.currentTemperature}, Rain Risk ${liveWeather.forecastSummary?.rainChance || "Low"}
+Weather Forecast (${liveWeather.weatherLabel}): Temperature ${liveWeather.currentTemperature}, Rain Risk ${liveWeather.forecastSummary?.rainChance || "Low"}
 Retrieved Community Favorite Places (in optimized route order):
 ${JSON.stringify(
   optimizedStops.map((s, idx) => ({

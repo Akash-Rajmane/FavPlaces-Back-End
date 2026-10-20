@@ -4,24 +4,76 @@ import logger from "../util/logger.js";
 const toolLogger = logger.child({ component: "mcp-tools" });
 
 /**
- * Tool 1: Live Weather Forecast via Open-Meteo (Free, No API key needed, high reliability)
+ * Tool 1: Live Weather & Date-specific Forecast via Open-Meteo (Free, No API key needed, high reliability)
+ * Supports up to 16 days of daily forecasts when a travel date is selected.
  * @param {number} lat
  * @param {number} lng
+ * @param {string|null} startDate - YYYY-MM-DD
  */
-export const getLiveWeatherTool = async ({ lat, lng }) => {
+export const getLiveWeatherTool = async ({ lat, lng, startDate = null }) => {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=16&timezone=auto`;
     const res = await axios.get(url, { timeout: 6000 });
     const current = res.data.current_weather;
     const daily = res.data.daily;
 
+    const formatDisplayDate = (dateStr) => {
+      if (!dateStr) return "";
+      try {
+        const parts = dateStr.split("-");
+        if (parts.length === 3) {
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        }
+        return dateStr;
+      } catch (_) {
+        return dateStr;
+      }
+    };
+
+    let targetIndex = -1;
+    if (startDate && daily?.time) {
+      targetIndex = daily.time.indexOf(startDate);
+    }
+
+    if (targetIndex > 0) {
+      // Future date within the 16-day forecast range
+      const formattedDate = formatDisplayDate(startDate);
+      const maxT = daily.temperature_2m_max?.[targetIndex] ?? "N/A";
+      const minT = daily.temperature_2m_min?.[targetIndex] ?? "N/A";
+      const rain = daily.precipitation_probability_max?.[targetIndex] ?? 0;
+
+      return {
+        isDateSpecific: true,
+        targetDate: startDate,
+        weatherLabel: `Forecast for ${formattedDate}`,
+        currentTemperature: `${maxT}°C / ${minT}°C`,
+        windSpeed: `${current?.windspeed || "N/A"} km/h`,
+        forecastSummary: {
+          maxTemp: `${maxT}°C`,
+          minTemp: `${minT}°C`,
+          rainChance: `${rain}%`,
+        },
+      };
+    }
+
+    // Default: Today's live conditions
+    const todayMax = daily?.temperature_2m_max?.[0] ?? "N/A";
+    const todayMin = daily?.temperature_2m_min?.[0] ?? "N/A";
+    const todayRain = daily?.precipitation_probability_max?.[0] ?? 0;
+
     return {
+      isDateSpecific: false,
+      targetDate: startDate || null,
+      weatherLabel: startDate
+        ? `Today's Weather (Trip on ${formatDisplayDate(startDate)})`
+        : "Today's Live Weather",
       currentTemperature: `${current?.temperature || "N/A"}°C`,
       windSpeed: `${current?.windspeed || "N/A"} km/h`,
       forecastSummary: {
-        maxTemp: `${daily?.temperature_2m_max?.[0] || "N/A"}°C`,
-        minTemp: `${daily?.temperature_2m_min?.[0] || "N/A"}°C`,
-        rainChance: `${daily?.precipitation_probability_max?.[0] || 0}%`,
+        maxTemp: `${todayMax}°C`,
+        minTemp: `${todayMin}°C`,
+        rainChance: `${todayRain}%`,
       },
     };
   } catch (err) {
@@ -29,6 +81,8 @@ export const getLiveWeatherTool = async ({ lat, lng }) => {
       error: err.message,
     });
     return {
+      isDateSpecific: false,
+      weatherLabel: "Weather Estimate",
       currentTemperature: "Pleasant (22°C - 28°C)",
       forecastSummary: { rainChance: "Low (< 15%)" },
     };
