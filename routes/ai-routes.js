@@ -27,8 +27,8 @@ const uploadMemory = multer({
 // POST /api/ai/ask-place (Accessible to all users viewing a place)
 router.post("/ask-place", askPlaceAssistantHandler);
 
-// POST /api/ai/plan-trip (Autonomous trip planner via RAG + MCP)
-router.post("/plan-trip", planTripHandler);
+// POST /api/ai/plan-trip (Autonomous trip planner - Premium Pro feature)
+router.post("/plan-trip", checkAuth, planTripHandler);
 
 // Protect creation/editing AI endpoints with authenticated session
 router.use(checkAuth);

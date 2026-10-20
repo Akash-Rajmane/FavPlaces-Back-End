@@ -212,6 +212,7 @@ const signup = async (req, res, next) => {
     email: createdUser.email,
     name: createdUser.name,
     image: createdUser.image,
+    isPremium: !!createdUser.isPremium,
     token,
   });
 };
@@ -304,6 +305,7 @@ const login = async (req, res, next) => {
     email: existingUser.email,
     name: existingUser.name,
     image: existingUser.image,
+    isPremium: !!existingUser.isPremium,
     token,
   });
 };
@@ -396,6 +398,7 @@ const googleLogin = async (req, res, next) => {
     email: user.email,
     name: user.name,
     image: user.image,
+    isPremium: !!user.isPremium,
     token,
   });
 };

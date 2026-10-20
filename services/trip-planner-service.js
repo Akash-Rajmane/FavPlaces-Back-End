@@ -30,10 +30,13 @@ export const planAutonomousTrip = async ({
     onlyMyPlaces,
   });
 
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 1: Generating embedding for city=${city}...`);
   // 1. RAG STEP: Vectorize the user's travel intent
   const queryText = `Best places, attractions, cafes, viewpoints, and hidden gems in ${city || ""}. Vibe: ${vibe}`;
   const queryVector = await generateEmbedding(queryText);
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 1 DONE: Vector length=${queryVector?.length}`);
 
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 2: Querying MongoDB candidate spots...`);
   // 2. RAG STEP: Retrieve candidate spots from MongoDB
   let candidatePlaces = [];
 
@@ -97,6 +100,7 @@ export const planAutonomousTrip = async ({
     candidatePlaces = await Place.find().limit(8).lean();
   }
 
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 2 DONE: Found ${candidatePlaces.length} candidate spots.`);
   // 3. MCP STEP: Route Optimization (Order spots by proximity)
   const placeStops = candidatePlaces.map((p) => ({
     id: p._id,
@@ -111,9 +115,11 @@ export const planAutonomousTrip = async ({
   const optimizedStops = optimizeRouteOrderTool({ places: placeStops });
 
   // 4. MCP STEP: Live Weather Check using first stop's coordinates
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 4: Calling live weather...`);
   const anchorLat = optimizedStops[0]?.lat || 18.5204;
   const anchorLng = optimizedStops[0]?.lng || 73.8567;
   const liveWeather = await getLiveWeatherTool({ lat: anchorLat, lng: anchorLng });
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 4 DONE: Weather=${liveWeather.currentTemperature}`);
 
   // 5. SYNTHESIS STEP: Gemini builds a realistic, timed itinerary
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -159,30 +165,54 @@ Format the output strictly as a JSON object with this exact structure:
   ]
 }`;
 
-  let rawJson = "{}";
-  try {
-    const aiResponse = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.5,
-      },
-    });
-    rawJson = aiResponse.text?.trim() || "{}";
-  } catch (genErr) {
-    const aiResponse = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.5,
-      },
-    });
-    rawJson = aiResponse.text?.trim() || "{}";
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 5: Calling Gemini for full itinerary synthesis...`);
+  const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-flash-lite"];
+  let rawJson = null;
+  let lastError = null;
+
+  for (const modelName of candidateModels) {
+    try {
+      console.log(`[TRIP PLANNER] Attempting synthesis with ${modelName}...`);
+      const aiResponse = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.4,
+        },
+      });
+      const text = aiResponse.text?.trim();
+      if (text) {
+        rawJson = text;
+        console.log(`[TRIP PLANNER] Synthesis SUCCESS with ${modelName}`);
+        break;
+      }
+    } catch (modelErr) {
+      console.warn(`[TRIP PLANNER] Model ${modelName} failed:`, modelErr.message);
+      lastError = modelErr;
+    }
   }
 
-  const parsedPlan = JSON.parse(rawJson);
+  if (!rawJson) {
+    const errMsg = lastError?.message || "";
+    if (errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("UNAVAILABLE")) {
+      throw new Error("AI service is currently experiencing high demand. Please wait a few seconds and try again.");
+    }
+    if (errMsg.includes("429") || errMsg.includes("quota")) {
+      throw new Error("AI request limit reached. Please wait a moment and try again.");
+    }
+    throw new Error("AI trip generation is momentarily busy. Please try again in a few moments.");
+  }
+
+  console.log(`[TRIP PLANNER] [${new Date().toISOString()}] Step 5 DONE: Received JSON length=${rawJson.length}`);
+
+  let parsedPlan;
+  try {
+    parsedPlan = JSON.parse(rawJson);
+  } catch (jsonErr) {
+    console.error("[TRIP PLANNER] Failed to parse generated JSON:", rawJson);
+    throw new Error("Generated itinerary could not be parsed. Please try generating again.");
+  }
 
   // Flatten schedule items for Calendar tool
   const flattenedSchedule = [];

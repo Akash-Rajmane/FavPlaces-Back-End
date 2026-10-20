@@ -11,6 +11,7 @@ import followRoutes from "./routes/follow-routes.js";
 import pushRoutes from "./routes/push-routes.js";
 import notificationsRoutes from "./routes/notifications-routes.js";
 import aiRoutes from "./routes/ai-routes.js";
+import paymentRoutes from "./routes/payment-routes.js";
 import HttpError from "./models/http-error.js";
 import {
   metricsMiddleware,
@@ -145,6 +146,7 @@ app.use("/api/follow", followRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/payment", paymentRoutes);
 
 app.use((req, res, next) => {
   return next(new HttpError("Could not find this route.", 404));

@@ -1,4 +1,5 @@
 import HttpError from "../models/http-error.js";
+import User from "../models/user.js";
 import {
   analyzePlaceImage,
   polishPlaceDescription,
@@ -115,7 +116,27 @@ export const askPlaceAssistantHandler = async (req, res, next) => {
 export const planTripHandler = async (req, res, next) => {
   const requestLogger = req.logger || console;
   const { city, days, vibe, startDate, onlyMyPlaces } = req.body;
-  const userId = req.userData?.userId || null;
+  const userId = req.userData?.userId;
+
+  if (!userId) {
+    return next(new HttpError("Authentication required. Please log in to use Trip Planner.", 401));
+  }
+
+  let user;
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    return next(new HttpError("Fetching user data failed, please try again later.", 500));
+  }
+
+  if (!user || !user.isPremium) {
+    return next(
+      new HttpError(
+        "Trip Planner is a Premium feature. Please upgrade to FavPlaces Pro to unlock AI Trip Planning.",
+        403
+      )
+    );
+  }
 
   try {
     requestLogger.info?.("Planning trip with RAG + MCP...", { city, days, vibe, startDate });
@@ -137,12 +158,22 @@ export const planTripHandler = async (req, res, next) => {
   } catch (err) {
     console.error("Trip planning error:", err);
     requestLogger.error?.("Trip planning error:", { error: err.message, stack: err.stack });
-    return next(
-      new HttpError(
-        err.message || "Failed to plan trip. Please try again.",
-        500
-      )
-    );
+
+    let cleanMessage = err.message || "Failed to plan trip. Please try again.";
+    if (typeof cleanMessage === "string" && (cleanMessage.includes('{"error"') || cleanMessage.startsWith("{"))) {
+      try {
+        const parsed = JSON.parse(cleanMessage);
+        if (parsed.error?.code === 503 || parsed.error?.message?.includes("high demand") || parsed.error?.status === "UNAVAILABLE") {
+          cleanMessage = "AI travel servers are currently experiencing temporary high traffic. Please wait 10 seconds and try again.";
+        } else if (parsed.error?.message) {
+          cleanMessage = parsed.error.message;
+        }
+      } catch (_) {
+        cleanMessage = "AI trip generation service is temporarily busy. Please try again shortly.";
+      }
+    }
+
+    return next(new HttpError(cleanMessage, 503));
   }
 };
 

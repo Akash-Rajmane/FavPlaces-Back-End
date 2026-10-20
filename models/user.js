@@ -22,6 +22,10 @@ const userSchema = new Schema({
       type: String,
     },
   ],
+  // 💎 SUBSCRIPTION / PREMIUM STATUS
+  isPremium: { type: Boolean, default: false },
+  paymentId: { type: String },
+  orderId: { type: String },
 });
 
 // 1. Create a Virtual to display the user's most recent unique interests
